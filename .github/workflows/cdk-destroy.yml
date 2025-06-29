@@ -38,5 +38,10 @@ jobs:
             echo "STACK_ENV=dev" >> $GITHUB_ENV
           fi
 
+      - name: Get CDK stack name
+        id: stack
+        run: |
+          STACK_NAME=$(cdk list | head -n 1)
+          echo "STACK_NAME=$STACK_NAME" >> $GITHUB_ENV
       - name: Destroy CDK stack
-        run: cdk destroy MyCdkStack-${{ env.STACK_ENV }} --force
+        run: cdk destroy ${{ STACK_NAME }} --force
