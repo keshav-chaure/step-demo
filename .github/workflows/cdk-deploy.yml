@@ -1,0 +1,66 @@
+name: Deploy AWS CDK Stack
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install AWS CDK
+        run: npm install -g aws-cdk
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Determine environment
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "STACK_ENV=prod" >> $GITHUB_ENV
+            echo "ENV_NAME=prod" >> $GITHUB_ENV
+          else
+            echo "STACK_ENV=dev" >> $GITHUB_ENV
+            echo "ENV_NAME=dev" >> $GITHUB_ENV
+          fi
+
+      - name: CDK Bootstrap (safe for reuse)
+        run: |
+          cdk bootstrap aws://$AWS_ACCOUNT_ID/${{ secrets.AWS_REGION }} || echo "Already bootstrapped"
+
+      - name: Synthesize CDK app
+        run: cdk synth
+
+      - name: Get stack name
+        run: |
+          STACK_NAME=$(cdk list | grep $STACK_ENV | head -n 1)
+          echo "STACK_NAME=$STACK_NAME" >> $GITHUB_ENV
+          echo "Deploying stack: $STACK_NAME"
+
+      - name: Deploy if changes detected
+        run: |
+          echo "Checking changes for $STACK_NAME"
+          if cdk diff $STACK_NAME | grep -q "There were no differences"; then
+            echo "✅ No changes. Skipping deployment."
+          else
+            echo "🚀 Changes detected. Deploying..."
+            cdk deploy $STACK_NAME --require-approval never -c env=$ENV_NAME
+          fi

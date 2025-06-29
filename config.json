@@ -1,0 +1,12 @@
+{
+    "dev": {
+      "bucketName": "step-demo-source-bucket-dev",
+      "region": "ap-south-1",
+      "email": "keshav.chaure@gmail.com"
+    },
+    "prod": {
+      "bucketName": "step-demo-source-bucket-prod",
+      "region": "ap-south-1",
+      "email": "keshav.chaure@gmail.com"
+    }
+  }

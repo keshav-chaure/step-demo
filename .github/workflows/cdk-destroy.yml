@@ -1,0 +1,47 @@
+name: Destroy AWS CDK Stack
+
+on:
+  workflow_dispatch  # Manually triggered from GitHub Actions
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install AWS CDK
+        run: npm install -g aws-cdk
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Determine environment
+        id: env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "STACK_ENV=prod" >> $GITHUB_ENV
+          else
+            echo "STACK_ENV=dev" >> $GITHUB_ENV
+          fi
+
+      - name: Get CDK stack name
+        id: stack
+        run: |
+          STACK_NAME=$(cdk list | head -n 1)
+          echo "STACK_NAME=$STACK_NAME" >> $GITHUB_ENV
+      - name: Destroy CDK stack
+        run: cdk destroy ${{ STACK_NAME }} --force
