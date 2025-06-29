@@ -1,0 +1,69 @@
+name: Deploy AWS CDK
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install AWS CDK
+        run: npm install -g aws-cdk
+
+      - name: Install project dependencies
+        run: npm install
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Determine deployment environment
+        id: env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "STACK_ENV=prod" >> $GITHUB_ENV
+          else
+            echo "STACK_ENV=dev" >> $GITHUB_ENV
+          fi
+
+      - name: Bootstrap  CDK (if required)
+        run: |
+          cdk bootstrap aws://162040854450/ap-south-1 || echo "CDK already bootstrapped"
+
+
+      - name: Synthesize CloudFormation template
+        run: cdk synth
+
+      - name: Get CDK Stack Name from Synthesized Output
+        run: echo "STACK_NAME=$(cdk synth | grep -oP '(?<=AWS::CloudFormation::Stack").*' | head -n 1)" >> $GITHUB_ENV
+
+      - name: Get environment (Dev or Prod)
+        run: echo "ENV_NAME=${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}" >> $GITHUB_ENV
+
+      - name: Check for  Changes
+        run: |
+            if cdk diff | grep -q "There were no differences"; then
+              echo "No changes detected, skipping deployment."
+            else
+              echo "Changes detected, deploying..."
+              cdk deploy $STACK_NAME -c env=$ENV_NAME --require-approval never
+            fi
+
+      
+
+      
